@@ -8,16 +8,20 @@ import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort.Direction;
+import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.stereotype.Service;
 
 import br.com.marcelonidal.crud.domain.Cidade;
 import br.com.marcelonidal.crud.domain.Cliente;
 import br.com.marcelonidal.crud.domain.Endereco;
+import br.com.marcelonidal.crud.domain.enums.Perfil;
 import br.com.marcelonidal.crud.domain.enums.TipoCliente;
 import br.com.marcelonidal.crud.dto.ClienteDTO;
 import br.com.marcelonidal.crud.dto.ClienteNewDTO;
 import br.com.marcelonidal.crud.repositories.ClienteRepository;
 import br.com.marcelonidal.crud.repositories.EnderecoRepository;
+import br.com.marcelonidal.crud.security.UserSpringSecurity;
+import br.com.marcelonidal.crud.services.exceptions.AuthorizationException;
 import br.com.marcelonidal.crud.services.exceptions.DataIntegrityException;
 import br.com.marcelonidal.crud.services.exceptions.ObjectNotFoundException;
 
@@ -28,8 +32,16 @@ public class ClienteService {
 	private ClienteRepository repo;
 	@Autowired
 	private EnderecoRepository enderecoRepo;
+	@Autowired
+	private BCryptPasswordEncoder pwEncoder;
 			
 	public Cliente find(Integer id) throws ObjectNotFoundException {
+		
+		UserSpringSecurity user = UserService.authenticated();
+		if(user == null || !user.hasRole(Perfil.ADMIN) && !id.equals(user.getId())) {
+			throw new AuthorizationException("Acesso negado");
+		}
+		
 		Optional<Cliente> cat = repo.findById(id);
 		
 		return cat.orElseThrow(() -> new ObjectNotFoundException(
@@ -69,11 +81,11 @@ public class ClienteService {
 	}
 	
 	public Cliente fromDTO(ClienteDTO objDTO) {
-		return new Cliente(objDTO.getId(), objDTO.getNome(), objDTO.getEmail(), null, null);
+		return new Cliente(objDTO.getId(), objDTO.getNome(), objDTO.getEmail(), null, null, null);
 	}
 
 	public Cliente fromDTO(ClienteNewDTO objDTO) {
-		Cliente cli = new Cliente(null, objDTO.getNome(), objDTO.getEmail(), objDTO.getCpfOuCnpj(), TipoCliente.toEnum(objDTO.getTipo()));
+		Cliente cli = new Cliente(null, objDTO.getNome(), objDTO.getEmail(), objDTO.getCpfOuCnpj(), TipoCliente.toEnum(objDTO.getTipo()), pwEncoder.encode(objDTO.getSenha()));
 		Cidade cid = new Cidade(objDTO.getCidadeId(), null, null);
 		Endereco end = new Endereco(null, objDTO.getLogradouro(), objDTO.getNumero(), objDTO.getComplemento(), objDTO.getBairro(), objDTO.getCep(), cli, cid);
 		cli.getEnderecos().add(end);

@@ -1,0 +1,60 @@
+package br.com.marcelonidal.crud.security;
+
+import java.util.Date;
+
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.stereotype.Component;
+
+import io.jsonwebtoken.Claims;
+import io.jsonwebtoken.Jwts;
+import io.jsonwebtoken.SignatureAlgorithm;
+
+@Component
+public class JWTUtil {
+
+	@Value("${jwt.secret}")
+	private String secret;
+	
+	@Value("${jwt.expiration}")
+	private String expiration;
+	
+	public String generationToken(String username) {
+		Long millis = System.currentTimeMillis() + Long.parseLong(expiration);
+		Date date = new Date(millis);
+		return Jwts.builder()
+				.setSubject(username)
+				.setExpiration(date)
+				.signWith(SignatureAlgorithm.HS512, secret.getBytes())
+				.compact();
+	}
+	
+	public boolean tokenValido(String token) {
+		Claims claims = getClaims(token);
+		if(claims != null) {
+			String username = claims.getSubject();
+			Date expiration = claims.getExpiration();
+			Date now = new Date(System.currentTimeMillis());
+			if(username != null && expiration != null && now.before(expiration)) {
+				return true;
+			}
+		}
+		return false;
+	}
+	
+	public String getUsername(String token) {
+		// REIVINDICACAO USUARIO E TEMPO DE EXPIRACAO
+		Claims claims = getClaims(token);
+		if(claims != null) {
+			return claims.getSubject();
+		}
+		return null;
+	}
+
+	private Claims getClaims(String token) {
+		try {
+		return Jwts.parser().setSigningKey(secret.getBytes()).parseClaimsJws(token).getBody();
+		}catch(Exception e) {
+			return null;
+		}
+	}
+}
